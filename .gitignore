@@ -1,0 +1,11 @@
+*.png
+*.PNG
+*.jpeg
+*.out
+*.exe
+
+/env/*
+
+!app.py
+
+/test_images/*
