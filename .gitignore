@@ -3,9 +3,12 @@
 *.jpeg
 *.out
 *.exe
+*.xlsx
 
 /env/*
 
-!app.py
+__pycache__/*
+.pytest_cache/*
+
 
 /test_images/*

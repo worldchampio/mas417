@@ -10,8 +10,8 @@ from io import BytesIO
 import shutil
 import sys
 import cv2 as cv
-import keyboard
 import time
+from pyproj import Transformer, transformer
 
 class AreaSelector():
 
@@ -20,7 +20,7 @@ class AreaSelector():
         self.position_coordinates = np.array([0,0])
         self.position_bbox = np.array([0,0,0,0])
         self.bbx_scale_pre_map = 5000
-        self.bbx_scaling_factor = 1 #Default scaling
+        self.bbx_scale_pre_map_factor = 0
         #EXAMPLE https://ws.geonorge.no/stedsnavn/v1/navn?sok=Dalen&treffPerSide=100&side=1 
         self.position_url = 'https://ws.geonorge.no/stedsnavn/v1/navn?'
         self.map_url = 'https://openwms.statkart.no/skwms1/wms.topo4?' \
@@ -42,17 +42,27 @@ class AreaSelector():
         #Selecting the right coordinates
         coordinates = self.df_places['koordinater(E/N)'][self.selected_location]
 
+
+        #epsg:4326
+
         #Converting from WGS84 to EPSG:25833
         factor_east = 17082.7258123
         factor_north = 111108.084509015
 
-        east = (coordinates[0])*factor_east
-        north = (coordinates[1])*factor_north
+        # east = (coordinates[0])*factor_east
+        # north = (coordinates[1])*factor_north
 
+        coord_from = 'EPSG:25833'
+        coord_to = 'EPSG:4326'
+
+        transformer_file = Transformer.from_crs(coord_from, coord_to)
+        east,north = transformer_file.transform(coordinates[0],coordinates[1])
         #Adjusting self.bbx_scaling_factor if want larger map preview
-        y = self.bbx_scale_pre_map
-        bbx_pre = np.array([east-5000,north-5000, \
-            east+5000,north+5000])
+        y = 1+(self.bbx_scale_pre_map_factor/100)
+        bbx_pre = np.array([east-(5000*y),north-(5000*y), \
+            east+(5000*y),north+(5000*y)])
+        # bbx_pre = np.array([(east-5000),(north-5000), \
+        #     (east+5000),(north+5000)])
 
 
         resquest_url = f'{self.map_url}&BBOX={bbx_pre[0]},{bbx_pre[1]},{bbx_pre[2]},{bbx_pre[3]}'
@@ -76,10 +86,10 @@ class AreaSelector():
         cv.circle(img,(int(width/2),int(height/2)), 100, (0,0,255), 2)
 
         
-        print("Displaying preview of selected position, hit ESC to enter")
-        time.sleep(2)
+        print("Displaying preview of selected position, hit ESC to exit")
+        time.sleep(4)
         cv.imshow("Preview Position", img)
-        cv.waitKey(0)
+
 
 
 

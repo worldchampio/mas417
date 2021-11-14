@@ -1,14 +1,13 @@
-from keras.preprocessing.image import load_img
-import warnings
-from keras.preprocessing.image import img_to_array
-from keras.preprocessing.image import array_to_img
-
 import struct
 import numpy as np
 import requests
 from PIL import Image
 from io import BytesIO
 from itertools import product
+import addons
+import time
+import cv2 as cv
+
 try:
     from .cwrapped import tessellate
     c_lib = True
@@ -47,7 +46,6 @@ def _build_ascii_stl(facets):
     lines.append('endsolid ffd_geom')
     return lines
 
-
 def writeSTL(facets, file_name, ascii=False):
     """writes an ASCII or binary STL file"""
 
@@ -63,12 +61,10 @@ def writeSTL(facets, file_name, ascii=False):
 
     f.close()
 
-
 def roll2d(image, shifts):
     return np.roll(np.roll(image, shifts[0], axis=0), shifts[1], axis=1)
 
-
-def numpy2stl(A, fn, scale=0.07, mask_val=None, ascii=False,
+def numpy2stl(A, fn, scale=0.1, mask_val=None, ascii=False,
               max_width=100.,
               max_depth=60.,
               max_height=30.,
@@ -210,6 +206,41 @@ def rgb2gray(rgb):
 
 if __name__ == "__main__":
 
+    print("Welcome to a simple map stl file configurator")
+    time.sleep(1)
+    location = input("Please type in the desiered location to re-create:\n")
+    area_obj = addons.AreaSelector(location)
+    area_obj.position_selector_info_list()
+    while True:
+            specific_name = input("Is the name specific?(Y/N)")
+            if specific_name == "Y" or specific_name == "N":
+                break
+            else:
+                print("wrong input, try again")
+    if specific_name == "Y":
+        area_obj.specific_name_sorter()
+    area_obj.position_selector()
+    while True:
+            area_obj.map_previewer()
+            cv.waitKey(0)
+            cv.destroyAllWindows()
+            task_selector = input("Is the location right?\nOptions: zoom-out yes no\n Select the right option(zoom/yes/no):\n")
+            if task_selector == "yes":
+                break
+            elif task_selector == "no":
+                print("Please choose another location")
+                area_obj.position_selector()
+                continue
+            elif task_selector == "zoom":
+                area_obj.bbx_scale_pre_map_factor = int(input("Please choose the percentage to zoom out (whole numbers only!):\n"))
+                continue
+            else:
+                print("Wrong input, try again")
+                continue
+
+    
+
+    #Request body
     request_url = 'https://wms.geonorge.no/skwms1/wms.hoyde-dom?' \
            'SERVICE=WMS&' \
            'VERSION=1.3.0&' \
@@ -221,32 +252,27 @@ if __name__ == "__main__":
            'STYLES=&' \
            'WIDTH=1751&' \
            'HEIGHT=1241&' \
-           'BBOX=170945,6827764,'
-           #'BBOX=18676.05018252586,6845773.541229122,117163.78576648101,6915575.52858474'
-
+           'BBOX=18676.05018252586,6845773.541229122,117163.78576648101,6915575.52858474'
 
     response = requests.get(request_url, verify=True)  # SSL Cert verification explicitly enabled. (This is also default.)
+    
+    #Comment line below when app is finished
     print(f"HTTP response status code = {response.status_code}")
     
     img = Image.open(BytesIO(response.content))
-       
-    #img = Image.open("jostedal.PNG")
-    #width, height = img.size
+
+    # Save image to png
+    
+    #Convert to array and grayscale
     np_img = np.asarray(img)
     img_gray = rgb2gray(np_img)
 
-    # KERAS + TENSORFLOW
-    #img = load_img('jostedal.png')
-    
-    #np_img = img_to_array(img)
-    
-    #np_img = np.array(img,dtype=object)
-    
-
+    #Uncomment multiline to display image
     """
     img = Image.fromarray(np.uint8(np_img))
     img.show()
     """
 
-    numpy2stl(img_gray,'testfil2.stl',solid=True)
+    # Create STL file from image
+    numpy2stl(img_gray,'testfil.stl',solid=True)
     
