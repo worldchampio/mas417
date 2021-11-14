@@ -3,9 +3,8 @@
 *.jpeg
 *.out
 *.exe
+*.stl
 
 /env/*
-
-!app.py
 
 /test_images/*
