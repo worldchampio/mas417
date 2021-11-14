@@ -11,7 +11,7 @@ Use several APIs to fetch data based on simple user input to create a user-custo
 ### Quick-start
 - Create a Python3 virtualenv to match `dependencies.txt`
     ```console
-    $ cd sourcedirectory        
+    $ cd <sourcedirectory>        
     $ python3 -m venv env
     $ source env/bin/activate    #confirm pip is installed with 'which pip', should output path
 
@@ -21,6 +21,13 @@ Use several APIs to fetch data based on simple user input to create a user-custo
 - Run `app.py` and follow the prompts
 
 - Print the resulting `.stl` file in a 3D printer of your choice
+
+### Update dependencies
+With virtualenv activated:
+
+    ```console
+    $ pip list --local > dependencies.txt
+    ```
 
 ### APIs
 - [Kartverket WMS, Topografi, Stedsnavn](https://wms.geonorge.no/skwms1/wms.hoyde-dom?)
