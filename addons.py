@@ -77,32 +77,7 @@ class CreateSTL():
                 solid=False,
                 min_thickness_percent=0.1,
                 force_python=False):
-        """
-        Reads a numpy array, and outputs an STL file
-        Inputs:
-        A (ndarray) -  an 'm' by 'n' 2D numpy array
-        fn (string) -  filename to use for STL file
-        Optional input:
-        scale (float)  -  scales the height (surface) of the
-                        resulting STL mesh. Tune to match needs
-        mask_val (float) - any element of the inputted array that is less
-                            than this value will not be included in the mesh.
-                            default renders all vertices (x > -inf for all float x)
-        ascii (bool)  -  sets the STL format to ascii or binary (default)
-        max_width, max_depth, max_height (floats) - maximum size of the stl
-                                                    object (in mm). Match this to
-                                                    the dimensions of a 3D printer
-                                                    platform
-        solid (bool): sets whether to create a solid geometry (with sides and
-                        a bottom) or not.
-        min_thickness_percent (float) : when creating the solid bottom face, this
-                                        multiplier sets the minimum thickness in
-                                        the final geometry (shallowest interior
-                                        point to bottom face), as a percentage of
-                                        the thickness of the model computed up to
-                                        that point.
-        Returns: (None)
-        """
+    
         m, n = A.shape
         #m = size_x
         #n = size_y
@@ -234,6 +209,50 @@ class CreateSTL():
         np_img = np.asarray(img)
         img_gray = self.rgb2gray(np_img)
         return img_gray
+    
+    def create_bbox(self,places,location_choice):
+        #Selecting the right coordinates
+        coordinates = self.df_places['koordinater(E/N)'][self.selected_location]
+
+        #Converting from WGS84 to EPSG:25833
+        factor_east = 17082.7258123
+        factor_north = 111108.084509015
+
+        east = (coordinates[0])*factor_east
+        north = (coordinates[1])*factor_north
+
+        #Adjusting self.bbx_scaling_factor if want larger map preview
+        y = self.bbx_scale_pre_map
+        bbx_pre = np.array([east-5000,north-5000, \
+            east+5000,north+5000])
+
+
+        resquest_url = f'{self.map_url}&BBOX={bbx_pre[0]},{bbx_pre[1]},{bbx_pre[2]},{bbx_pre[3]}'
+        response = requests.get(resquest_url, verify=True)  # SSL Cert verification explicitly enabled. (This is also default.)
+        # print(f"HTTP response status code = {response.status_code}")
+        if response.status_code != 200:
+            raise RuntimeError('Invalid map area or no connection with geonorge.no')
+        # print(type(response.content))
+        # print(sys.getsizeof(response.content))
+
+        img = Image.open(BytesIO(response.content))
+
+        img.save('temp_map_area_pre.png')  
+
+        img = cv.imread(cv.samples.findFile("temp_map_area_pre.png"))
+        height, width = img.shape[:2]
+
+        #Applying some pointer circles to highlight the selected area
+        cv.circle(img,(int(width/2),int(height/2)), 2, (0,0,255), 2)
+        cv.circle(img,(int(width/2),int(height/2)), 50, (0,0,255), 2)
+        cv.circle(img,(int(width/2),int(height/2)), 100, (0,0,255), 2)
+
+        
+        print("Displaying preview of selected position, hit ESC to enter")
+        time.sleep(2)
+        cv.imshow("Preview Position", img)
+        cv.waitKey(0)
+
 
 class AreaSelector():
 

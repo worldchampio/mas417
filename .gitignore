@@ -5,6 +5,7 @@
 *.exe
 *.stl
 
+__pycache__
 /env/*
 
 /test_images/*

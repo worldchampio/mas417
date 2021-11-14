@@ -1,7 +1,9 @@
-# MAS417
+# .STfjell app
 3D Print geographical features in norway with .stl generation
 
+
 *Written by Eirik Norrheim Larsen & Magnus Nilsen*
+
 
 ## Description
 Use several APIs to fetch data based on simple user input to create a user-customizable product, in this case a 3D-print ready .stl file.
@@ -21,9 +23,7 @@ Use several APIs to fetch data based on simple user input to create a user-custo
 - Print the resulting `.stl` file in a 3D printer of your choice
 
 ### APIs
-- [Kartverket WMS](https://wms.geonorge.no/skwms1/wms.hoyde-dom?)
-- [API2]()
-- [API3]()
+- [Kartverket WMS, Topografi, Stedsnavn](https://wms.geonorge.no/skwms1/wms.hoyde-dom?)
 
 ### Credits
 - [STL generation methods](https://github.com/RobertABT/heightmap)
