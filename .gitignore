@@ -4,6 +4,8 @@
 *.out
 *.exe
 *.stl
+*.xlsx
+
 
 __pycache__
 /env/*
