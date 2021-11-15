@@ -212,7 +212,7 @@ if __name__ == "__main__":
     area_obj = addons.AreaSelector(location)
     area_obj.position_selector_info_list()
     while True:
-            specific_name = input("Is the name specific?(Y/N)")
+            specific_name = input("Is the name specific?(Y/N):\n")
             if specific_name == "Y" or specific_name == "N":
                 break
             else:
