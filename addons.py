@@ -72,11 +72,15 @@ class AreaSelector():
         cv.circle(img,(int(width/2),int(height/2)), 100, (0,0,255), 2)
 
         #Applying some text to indicate how to exit the window
-        # cv.putText(img, "Hit ESC to EXIT", (int(width/2),int(height/2)+200), fontFace=cv.FONT_HERSHEY_SIMPLEX, 4 ,(0,0,255), )
+        font = cv.FONT_HERSHEY_SIMPLEX
+        cv.putText(img, "Hit ESC to EXIT", (int(width/2)-120,int(height/2)-125), font, 1,(0,0,255), 2, cv.LINE_AA )
         
         print("Displaying preview of selected position, hit ESC to exit")
         time.sleep(4)
         cv.imshow("Preview Position. Hit ESC to EXIT", img)
+
+        #Setting the new coordinates to the instance variable to be used in the STL converter
+        self.position_coordinates = [east,north]
 
 
 

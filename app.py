@@ -206,7 +206,7 @@ def rgb2gray(rgb):
 
 if __name__ == "__main__":
 
-    print("Welcome to a simple map stl file configurator")
+    print("Welcome to a simple map stl file constructor")
     time.sleep(1)
     location = input("Please type in the desiered location to re-create:\n")
     area_obj = addons.AreaSelector(location)
