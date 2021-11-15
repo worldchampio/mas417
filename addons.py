@@ -1,7 +1,6 @@
 
 import numpy as np
 import requests
-
 import pandas as pd
 import os
 from PIL import Image
@@ -40,11 +39,11 @@ class AreaSelector():
         #Selecting the right coordinates
         coordinates = self.df_places['koordinater(E/N)'][self.selected_location]
 
-        # east,north = transformer_file.transform(coordinates[0],coordinates[1])
         east = float(coordinates[0])
         north = float(coordinates[1])
 
         #Adjusting self.bbx_scaling_factor if user want larger map preview
+        #Making variables for instance.variables in order to keep boundingbox equation cleaner
         y = 1+(self.bbx_scale_pre_map_factor/100)
         size = self.pre_map_default_size
         bbx_pre = np.array([east-(size*y),north-(size*y), \
