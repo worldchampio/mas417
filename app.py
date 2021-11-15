@@ -53,7 +53,4 @@ if __name__ == "__main__":
     image_wms = obj.img_from_wms(bbox_in)
 
     # Convert from img -> np -> stl
-    obj.numpy2stl(image_wms,'fjell.stl',solid=True)
-    
-
-    
+    obj.numpy2stl(image_wms,'fjell.stl',solid=True,scale=0.2)

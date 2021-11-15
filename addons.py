@@ -3,6 +3,7 @@ import requests
 import json
 import pandas as pd
 import os
+import platform
 import openpyxl
 from PIL import Image
 from io import BytesIO
@@ -200,7 +201,7 @@ class CreateSTL():
            'BBOX='+str(bbox_input)
 
         response = requests.get(request_url, verify=True)  # SSL Cert verification explicitly enabled. (This is also default.)
-        print(f"HTTP response status code = {response.status_code}")
+        #print(f"HTTP response status code = {response.status_code}")
         img = Image.open(BytesIO(response.content))
     
         #Convert to array and grayscale
