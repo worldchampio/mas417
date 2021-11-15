@@ -1,12 +1,15 @@
-
 import numpy as np
 import requests
 import pandas as pd
 import os
-from PIL import Image
-from io import BytesIO
 import cv2 as cv
 import time
+import shlex
+import sys
+from PIL import Image
+from io import BytesIO
+from sys import platform
+
 
 class AreaSelector():
 
@@ -15,6 +18,7 @@ class AreaSelector():
         self.position_coordinates = np.array([0,0])
         self.bbx_scale_pre_map_factor = 0
         self.pre_map_default_size = 40000
+        self.position_selector_flag = False
         #EXAMPLE https://ws.geonorge.no/stedsnavn/v1/navn?sok=Dalen&treffPerSide=100&side=1 
         self.position_url = 'https://ws.geonorge.no/stedsnavn/v1/navn?'
         self.map_url = 'https://openwms.statkart.no/skwms1/wms.topo4?' \
@@ -54,8 +58,6 @@ class AreaSelector():
         # print(f"HTTP response status code = {response.status_code}")
         if response.status_code != 200:
             raise RuntimeError('Invalid map area or no connection with geonorge.no')
-        # print(type(response.content))
-        # print(sys.getsizeof(response.content))
 
         img = Image.open(BytesIO(response.content))
 
@@ -69,6 +71,8 @@ class AreaSelector():
         cv.circle(img,(int(width/2),int(height/2)), 50, (0,0,255), 2)
         cv.circle(img,(int(width/2),int(height/2)), 100, (0,0,255), 2)
 
+        #Applying some text to indicate how to exit the window
+        # cv.putText(img, "Hit ESC to EXIT", (int(width/2),int(height/2)+200), fontFace=cv.FONT_HERSHEY_SIMPLEX, 4 ,(0,0,255), )
         
         print("Displaying preview of selected position, hit ESC to exit")
         time.sleep(4)
@@ -80,13 +84,33 @@ class AreaSelector():
     def position_selector(self) -> None:
         """Lets the user choose the correct place from the results generated in position_selector_info_list"""
 
+
         #Checks if the results are more than 10 and in that case lists them in an excel file to not drown the terminal
         if len(self.df_places) > 10:
             excel_file_path = f'{os.getcwd()}/place_list_browser.xlsx'
             print(f"The location searched for yielded more than 10 results, results are listed in {excel_file_path} for further inspection")
-            self.df_places.to_excel(excel_file_path)
+            
+            #Checking if the user has an open excel window, which wil block the program from writing a new list
+            if self.position_selector_flag == False and os.path.isfile(excel_file_path):
+                wait = input("Please make sure the place_list_browser.xlsx file is closed to avoid blocking generating of new list\nThen hit ENTER")
+
+            #Checking if the user has the excel file already open to avoid an IO error
+            try:
+                self.df_places.to_excel(excel_file_path)
+                #Checking operating system to select correct method for automatic file opening
+                if platform == "linux" or platform == "darwin":
+                    os.system("open " + shlex.quote(excel_file_path))
+                else:
+                    os.system("start " + excel_file_path)
+            except IOError:
+                if self.position_selector_flag == False:
+                    print("No new list file were constructed, please close current place_list_browser.xlsx file and restart the program")
+                    sys.exit()
         else:
             print(self.df_places)
+
+        #Stating that the program has now ran its first time
+        self.position_selector_flag = True
 
         #The user selects their place by typing in the index number
         while True:
@@ -97,7 +121,6 @@ class AreaSelector():
             except ValueError:
                 print("Input is not an integer, try again")
                 continue
-
 
 
 
