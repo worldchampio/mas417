@@ -9,8 +9,6 @@ from io import BytesIO
 import shutil
 import sys
 #import cv2 as cv        <- cv is imported below (on Ubuntu)
-import cv
-import keyboard
 import time
 import struct
 from itertools import product
@@ -104,7 +102,7 @@ class CreateSTL():
         else:  # use python + numpy
             facets = []
             mask = np.zeros((m, n))
-            print("Creating top mesh...")
+            print("Lager 3D modell...")
             for i, k in product(range(m - 1), range(n - 1)):
 
                 this_pt = np.array([i - m / 2., k - n / 2., A[i, k]])
@@ -136,7 +134,7 @@ class CreateSTL():
             facets = np.array(facets)
 
             if solid:
-                print("Computed edges...")
+                #print("Computed edges...")
                 edge_mask = np.sum([self.roll2d(mask, (i, k))
                                 for i, k in product([-1, 0, 1], repeat=2)],
                                 axis=0)
@@ -153,7 +151,7 @@ class CreateSTL():
                 minval = zmin - min_thickness_percent * zthickness
 
                 bottom = []
-                print("Extending edges, creating bottom...")
+                #print("Extending edges, creating bottom...")
                 for i, facet in enumerate(facets):
                     if (facet[3], facet[4]) in locs:
                         facets[i][5] = minval
@@ -215,9 +213,9 @@ class AreaSelector():
     def __init__(self, position_name) -> None:
         self.position_name = position_name
         self.position_coordinates = np.array([0,0])
-        self.position_bbox = np.array([0,0,0,0])
-        self.bbx_scale_pre_map = 5000
-        self.bbx_scaling_factor = 1 #Default scaling
+        self.bbx_scale_pre_map_factor = 0
+        self.pre_map_default_size = 40000
+        self.position_selector_flag = False
         #EXAMPLE https://ws.geonorge.no/stedsnavn/v1/navn?sok=Dalen&treffPerSide=100&side=1 
         self.position_url = 'https://ws.geonorge.no/stedsnavn/v1/navn?'
         self.map_url = 'https://openwms.statkart.no/skwms1/wms.topo4?' \
@@ -230,60 +228,93 @@ class AreaSelector():
             'LAYERS=topo4_WMS&' \
             'WIDTH=1050&' \
             'HEIGHT=1050&' \
-            'TRANSPARENT=True&' 
+            'TRANSPARENT=True&' \
             #Width and height used for a normal 1080p monitor, which is assumed to be the standard
 
-    def map_previewer(self):
+
+
+
+    def map_previewer(self) -> None:
+        """Function which lets the user preview the selected location before constructing the STL"""
+
         #Selecting the right coordinates
         coordinates = self.df_places['koordinater(E/N)'][self.selected_location]
 
-        #Converting from WGS84 to EPSG:25833
-        factor_east = 17082.7258123
-        factor_north = 111108.084509015
+        east = float(coordinates[0])
+        north = float(coordinates[1])
 
-        east = (coordinates[0])*factor_east
-        north = (coordinates[1])*factor_north
+        #Adjusting self.bbx_scaling_factor if user want larger map preview
+        #Making variables for instance.variables in order to keep boundingbox equation cleaner
+        y = 1+(self.bbx_scale_pre_map_factor/100)
+        size = self.pre_map_default_size
+        bbx_pre = np.array([east-(size*y),north-(size*y), \
+            east+(size*y),north+(size*y)])
 
-        #Adjusting self.bbx_scaling_factor if want larger map preview
-        y = self.bbx_scale_pre_map
-        bbx_pre = np.array([east-5000,north-5000, \
-            east+5000,north+5000])
-
-
-        resquest_url = f'{self.map_url}&BBOX={bbx_pre[0]},{bbx_pre[1]},{bbx_pre[2]},{bbx_pre[3]}'
+        resquest_url = f'{self.map_url}BBOX={bbx_pre[0]},{bbx_pre[1]},{bbx_pre[2]},{bbx_pre[3]}'
         response = requests.get(resquest_url, verify=True)  # SSL Cert verification explicitly enabled. (This is also default.)
         # print(f"HTTP response status code = {response.status_code}")
         if response.status_code != 200:
             raise RuntimeError('Invalid map area or no connection with geonorge.no')
-        # print(type(response.content))
-        # print(sys.getsizeof(response.content))
 
         img = Image.open(BytesIO(response.content))
-
+        
         img.save('temp_map_area_pre.png')  
-
+        """
         img = cv.imread(cv.samples.findFile("temp_map_area_pre.png"))
         height, width = img.shape[:2]
-
+        
         #Applying some pointer circles to highlight the selected area
         cv.circle(img,(int(width/2),int(height/2)), 2, (0,0,255), 2)
         cv.circle(img,(int(width/2),int(height/2)), 50, (0,0,255), 2)
         cv.circle(img,(int(width/2),int(height/2)), 100, (0,0,255), 2)
-
         
-        print("Displaying preview of selected position, hit ESC to enter")
-        time.sleep(2)
-        cv.imshow("Preview Position", img)
-        cv.waitKey(0)
+        #Applying some text to indicate how to exit the window
+        font = cv.FONT_HERSHEY_SIMPLEX
+        cv.putText(img, "Hit ESC to EXIT", (int(width/2)-120,int(height/2)-125), font, 1,(0,0,255), 2, cv.LINE_AA )
+        """
+        print("Displaying preview of selected position, hit ESC to exit")
+        time.sleep(4)
+        #cv.imshow("Preview Position. Hit ESC to EXIT", img)
 
-    def position_selector(self):
+        #Setting the new coordinates to the instance variable to be used in the STL converter
+        self.coord_out_E = east
+        self.coord_out_N = north
+        self.size_out = size
+
+
+
+    def position_selector(self) -> None:
+        """Lets the user choose the correct place from the results generated in position_selector_info_list"""
+
+
+        #Checks if the results are more than 10 and in that case lists them in an excel file to not drown the terminal
         if len(self.df_places) > 10:
             excel_file_path = f'{os.getcwd()}/place_list_browser.xlsx'
             print(f"The location searched for yielded more than 10 results, results are listed in {excel_file_path} for further inspection")
-            self.df_places.to_excel(excel_file_path)
+            
+            #Checking if the user has an open excel window, which wil block the program from writing a new list
+            if self.position_selector_flag == False and os.path.isfile(excel_file_path):
+                wait = input("Please make sure the place_list_browser.xlsx file is closed to avoid blocking generating of new list\nThen hit ENTER")
+
+            #Checking if the user has the excel file already open to avoid an IO error
+            try:
+                self.df_places.to_excel(excel_file_path)
+                #Checking operating system to select correct method for automatic file opening
+                if platform == "linux" or platform == "darwin":
+                    os.system("open " + shlex.quote(excel_file_path))
+                else:
+                    os.system("start " + excel_file_path)
+            except IOError:
+                if self.position_selector_flag == False:
+                    print("No new list file were constructed, please close current place_list_browser.xlsx file and restart the program")
+                    sys.exit()
         else:
             print(self.df_places)
 
+        #Stating that the program has now ran its first time
+        self.position_selector_flag = True
+
+        #The user selects their place by typing in the index number
         while True:
             selected_location = input("Please browse for the correct position and enter the index number\n")
             try:
@@ -293,17 +324,21 @@ class AreaSelector():
                 print("Input is not an integer, try again")
                 continue
 
-    def position_selector_info_list(self):
-        search_url = f'{self.position_url}sok={self.position_name}&treffPerSide=500&side=1'
+
+
+    def position_selector_info_list(self) -> None:
+        """A function gathering all the results after searching for a specific place. NB! Maximum results is 500"""
+
+        search_url = f'{self.position_url}sok={self.position_name}&treffPerSide=500&side=1&utkoordsys=25833'
         response = requests.get(search_url, verify=True)
 
         response_dict = response.json()
         response_places = response_dict['navn']
 
+        #The app is shut down if no results are found and user has to restart it
         if not response_places:
             raise NameError('No result')
 
-        # print(response_places[0])
         df_places = pd.DataFrame.from_dict(response_places)
 
         ### Unpacking nested dicts for kommuner and fylker and generating independent coordinate row
@@ -319,10 +354,16 @@ class AreaSelector():
         df_places['kommune'] = response_municipality
         df_places['fylke'] = response_counties
         df_places['koordinater(E/N)'] = response_coordinate
-        self.df_places = df_places
-        print(self.df_places)
 
-    def specific_name_sorter(self):
+        self.df_places = df_places
+
+
+
+
+    def specific_name_sorter(self) -> None:
+        """ A Function used to only list name specific places. Example: Searching Dalen and selescting this function will
+            make results like Hasseldalen dissapear"""
+
         sorter = self.df_places['skrivemåte']
         for col in range(len(self.df_places)):
             
@@ -330,8 +371,6 @@ class AreaSelector():
                 self.df_places.drop([col], inplace=True)
     
         self.df_places.reset_index(drop=True, inplace=True)
-        # print(self.df_places)
-
 
 if __name__ == "__main__":
     pass
