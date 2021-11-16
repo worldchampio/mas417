@@ -2,9 +2,6 @@ import addons
 import time
 import cv2 as cv
 
-"""
-This app mainly work on Windows, other operative system may become problematic due to cross incompatebility with OpenCV
-"""
 
 def main():
     
