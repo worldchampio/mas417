@@ -1,15 +1,13 @@
 import numpy as np
 import requests
-import json
 import pandas as pd
 import os
 import platform
-import openpyxl
 from PIL import Image
 from io import BytesIO
-import shutil
+import shlex
 import sys
-#import cv2 as cv        <- cv is imported below (on Ubuntu)
+import cv2 as cv
 import time
 import struct
 from itertools import product
@@ -22,7 +20,7 @@ except ImportError:
 
 class CreateSTL():
 
-    def __init__(self) -> None:
+    def __init__(self, coordinates) -> None:
         self.ASCII_FACET = """  facet normal  {face[0]:e}  {face[1]:e}  {face[2]:e}
               outer loop
                 vertex    {face[3]:e}  {face[4]:e}  {face[5]:e}
@@ -30,9 +28,55 @@ class CreateSTL():
                 vertex    {face[9]:e}  {face[10]:e}  {face[11]:e}
               endloop
             endfacet"""
-
+        self.coordinates = coordinates
+        self.bbx_scale_factor = 0
+        self.map_default_size = 500
         self.BINARY_HEADER = "80sI"
         self.BINARY_FACET = "12fH"
+        self.map_url = 'https://openwms.statkart.no/skwms1/wms.topo4?' \
+            'SERVICE=WMS&' \
+            'VERSION=1.3.0&' \
+            'REQUEST=GetMap&' \
+            'FORMAT=image/png&' \
+            'STYLES=&' \
+            'CRS=EPSG:25833&' \
+            'LAYERS=topo4_WMS&' \
+            'WIDTH=1050&' \
+            'HEIGHT=1050&' \
+            'TRANSPARENT=True&' \
+            #Width and height used for a normal 1080p monitor, which is assumed to be the standard
+    
+
+
+    def print_area_prviewer(self) -> None:
+        """Function which lets the user preview the size of the selected location before constructing the STL"""
+
+        east = float(self.coordinates[0])
+        north = float(self.coordinates[1])
+
+        #Adjusting self.bbx_scaling_factor if user want larger map preview
+        #Making variables for instance.variables in order to keep boundingbox equation cleaner
+        y = 1+(self.bbx_scale_factor/100)
+        size = self.map_default_size
+        bbx_pre = np.array([east-(size*y),north-(size*y), \
+            east+(size*y),north+(size*y)])
+        self.bbx_pre = bbx_pre
+
+        resquest_url = f'{self.map_url}BBOX={bbx_pre[0]},{bbx_pre[1]},{bbx_pre[2]},{bbx_pre[3]}'
+        response = requests.get(resquest_url, verify=True)  # SSL Cert verification explicitly enabled. (This is also default.)
+        # print(f"HTTP response status code = {response.status_code}")
+        if response.status_code != 200:
+            raise RuntimeError('Invalid map area or no connection with geonorge.no')
+
+        img = Image.open(BytesIO(response.content))
+        
+        img.save('temp_map_bbx_pre.png')  
+        img = cv.imread(cv.samples.findFile("temp_map_bbx_pre.png"))
+  
+        print("Displaying preview of bounding box size, hit ESC to exit")
+        time.sleep(4)
+        cv.imshow("Preview Bounding box. Hit ESC to EXIT", img)
+
 
     def _build_binary_stl(self,facets):
         """returns a string of binary binary data for the stl file"""
@@ -69,14 +113,16 @@ class CreateSTL():
     def roll2d(self, image, shifts):
         return np.roll(np.roll(image, shifts[0], axis=0), shifts[1], axis=1)
 
-    def numpy2stl(self, A, fn, scale=0.1, mask_val=None, ascii=False,
+    def numpy2stl(self, scale=9, mask_val=None, ascii=False,
                 max_width=100.,
                 max_depth=60.,
-                max_height=30.,
-                solid=False,
+                max_height=60.,
+                solid=True,
                 min_thickness_percent=0.1,
                 force_python=False):
-    
+
+        A = self.print_img
+        fn = '3D_object.stl'
         m, n = A.shape
         #m = size_x
         #n = size_y
@@ -103,7 +149,7 @@ class CreateSTL():
         else:  # use python + numpy
             facets = []
             mask = np.zeros((m, n))
-            print("Lager 3D modell...")
+            print("Creating 3D model...")
             for i, k in product(range(m - 1), range(n - 1)):
 
                 this_pt = np.array([i - m / 2., k - n / 2., A[i, k]])
@@ -184,10 +230,10 @@ class CreateSTL():
     def rgb2gray(self, rgb):
         return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
 
-    def img_from_wms(self, bbox_input):
+    def img_from_wms(self):
 
         #Request body
-        request_url = 'https://wms.geonorge.no/skwms1/wms.hoyde-dom?' \
+        height_map_url = 'https://wms.geonorge.no/skwms1/wms.hoyde-dom?' \
            'SERVICE=WMS&' \
            'VERSION=1.3.0&' \
            'REQUEST=GetMap&' \
@@ -197,9 +243,10 @@ class CreateSTL():
            'CRS=EPSG:25833&' \
            'STYLES=&' \
            'WIDTH=1751&' \
-           'HEIGHT=1241&' \
-           'BBOX='+str(bbox_input)
+           'HEIGHT=1241&' 
 
+        bbx = self.bbx_pre
+        request_url = f'{height_map_url}BBOX={bbx[0]},{bbx[1]},{bbx[2]},{bbx[3]}'
         response = requests.get(request_url, verify=True)  # SSL Cert verification explicitly enabled. (This is also default.)
         #print(f"HTTP response status code = {response.status_code}")
         img = Image.open(BytesIO(response.content))
@@ -207,7 +254,7 @@ class CreateSTL():
         #Convert to array and grayscale
         np_img = np.asarray(img)
         img_gray = self.rgb2gray(np_img)
-        return img_gray
+        self.print_img = img_gray
 
 class AreaSelector():
 
@@ -260,8 +307,7 @@ class AreaSelector():
         img = Image.open(BytesIO(response.content))
         
         img.save('temp_map_area_pre.png')  
-        """
-        img = cv.imread(cv.samples.findFile("temp_map_area_pre.png"))
+        img = cv.imread("temp_map_area_pre.png")
         height, width = img.shape[:2]
         
         #Applying some pointer circles to highlight the selected area
@@ -272,15 +318,12 @@ class AreaSelector():
         #Applying some text to indicate how to exit the window
         font = cv.FONT_HERSHEY_SIMPLEX
         cv.putText(img, "Hit ESC to EXIT", (int(width/2)-120,int(height/2)-125), font, 1,(0,0,255), 2, cv.LINE_AA )
-        """
         print("Displaying preview of selected position, hit ESC to exit")
         time.sleep(4)
-        #cv.imshow("Preview Position. Hit ESC to EXIT", img)
+        cv.imshow("Preview Position. Hit ESC to EXIT", img)
 
         #Setting the new coordinates to the instance variable to be used in the STL converter
-        self.coord_out_E = east
-        self.coord_out_N = north
-        self.size_out = size
+        self.position_coordinates = [east,north]
 
 
 
@@ -336,11 +379,15 @@ class AreaSelector():
         response_dict = response.json()
         response_places = response_dict['navn']
 
-        #The app is shut down if no results are found and user has to restart it
-        if not response_places:
-            raise NameError('No result')
-
         df_places = pd.DataFrame.from_dict(response_places)
+
+        #The app is shut down if no results are found and user has to restart it
+        if response_places == False:
+            print("No result, please restart")
+            sys.exit()
+
+        # df_places = pd.DataFrame.from_dict(response_places)
+
 
         ### Unpacking nested dicts for kommuner and fylker and generating independent coordinate row
         response_counties = []
@@ -367,11 +414,15 @@ class AreaSelector():
 
         sorter = self.df_places['skrivemåte']
         for col in range(len(self.df_places)):
-            
             if sorter[col] != self.position_name:
                 self.df_places.drop([col], inplace=True)
     
         self.df_places.reset_index(drop=True, inplace=True)
+
+        #Checking if the name sorting has yielded in no results
+        if self.df_places.empty:
+            print("No result, please restart")
+            sys.exit()
 
 if __name__ == "__main__":
     pass
