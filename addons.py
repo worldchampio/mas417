@@ -11,12 +11,7 @@ import cv2 as cv
 import time
 import struct
 from itertools import product
-try:
-    from .cwrapped import tessellate
-    c_lib = True
-except ImportError:
-    c_lib = False
-
+c_lib = False
 
 class CreateSTL():
 
